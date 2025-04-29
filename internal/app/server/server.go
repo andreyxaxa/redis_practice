@@ -117,16 +117,20 @@ func (s *server) handleGetUser(w http.ResponseWriter, r *http.Request) {
 	id := vars["id"]
 
 	u, err := s.cache.User().GetUser(id)
+	// Если нашли в Кэше
 	if err == nil {
 		s.respondUser(w, u)
 		return
 	}
 
+	// Ошибка, не связанная с отсутствием юзера в Кэше
 	if !errors.Is(err, redis.Nil) {
 		http.Error(w, "cache: get user error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
+	// Если не нашли в Кэше
+	// Пробуем искать в БД
 	u, err = s.storage.User().GetUser(id)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -137,6 +141,7 @@ func (s *server) handleGetUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Если нашли в БД - создаем в Кэше
 	if err := s.cache.User().CreateUser(u); err != nil {
 		http.Error(w, "cache: create user error: "+err.Error(), http.StatusInternalServerError)
 		return
